@@ -1,0 +1,7 @@
+2026-05-21 10:00:01 [INFO] Service started on port 8080
+2026-05-21 10:00:05 [ERROR] Connection refused: postgres@10.10.10.10:5432
+2026-05-21 10:00:06 [WARN] Retry 1/3 failed. Timeout 30s
+2026-05-21 10:00:07 [INFO] Retry 2/3...
+2026-05-21 10:00:08 [INFO] Connection established to postgres@10.10.10.10:5432
+2026-05-21 10:02:15 [ERROR] Out of memory: unable to allocate 1024 bytes
+2026-05-21 10:02:16 [FATAL] Service crashed unexpectedly.

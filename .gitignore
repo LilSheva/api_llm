@@ -1,0 +1,5 @@
+log_analyzer.exe
+__pycache__/
+build/
+dist/
+*.spec
