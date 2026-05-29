@@ -16,6 +16,10 @@ DEFAULT_CONFIG = {
     "limit": 400,
     "timeout": 120,
     "temperature": 0.0,
+    "offset": False,
+    "retries": 0,
+    "sanitize": False,
+    "verbose": False,
     "system_instructions": (
         "Ты системный аналитик. Проанализируй логи внутри тега <data>.\n"
         "Найди: ошибки, критические предупреждения, аномальные паттерны.\n"
@@ -123,13 +127,19 @@ def main():
     parser.add_argument("-m", "--model", default=config["model"], help="Имя целевой модели.")
     parser.add_argument("-t", "--timeout", type=int, default=config["timeout"], help="Таймаут запроса API в секундах.")
     parser.add_argument("--temperature", type=float, default=config["temperature"], help="Температура генерации.")
-    parser.add_argument("-o", "--offset", action="store_true", help="Корректировать номера строк относительно всего файла.")
-    parser.add_argument("-r", "--retries", type=int, default=0, help="Количество повторных попыток при сбоях API (по умолчанию 0).")
-    parser.add_argument("--sanitize", action="store_true", help="Экранировать XML-теги внутри логов для защиты от Prompt Injection.")
-    parser.add_argument("-d", "--verbose", action="store_true", help="Включить подробное логирование отладки.")
+    parser.add_argument("-o", "--offset", action="store_true", default=None, help="Корректировать номера строк относительно всего файла.")
+    parser.add_argument("-r", "--retries", type=int, default=None, help="Количество повторных попыток при сбоях API (по умолчанию 0).")
+    parser.add_argument("--sanitize", action="store_true", default=None, help="Экранировать XML-теги внутри логов для защиты от Prompt Injection.")
+    parser.add_argument("-d", "--verbose", action="store_true", default=None, help="Включить подробное логирование отладки.")
     args = parser.parse_args()
 
-    configure_logging(args.verbose)
+    # Слияние флагов аргументов CLI с конфигурацией config.json
+    offset_enabled = args.offset if args.offset is not None else config.get("offset", False)
+    retries_count = args.retries if args.retries is not None else config.get("retries", 0)
+    sanitize_enabled = args.sanitize if args.sanitize is not None else config.get("sanitize", False)
+    verbose_enabled = args.verbose if args.verbose is not None else config.get("verbose", False)
+
+    configure_logging(verbose_enabled)
 
     if not os.path.isfile(args.file):
         logging.error("Файл логов не найден: %s", args.file)
@@ -148,7 +158,7 @@ def main():
     start_time = time.time()
 
     for idx, (chunk, chunk_size) in enumerate(log_chunks(args.file, args.limit), 1):
-        if args.sanitize:
+        if sanitize_enabled:
             chunk = chunk.replace("</data>", "<\\/data>")
 
         raw_response = None
@@ -160,7 +170,7 @@ def main():
                 logs=chunk,
                 temperature=args.temperature,
                 timeout=args.timeout,
-                retries=args.retries
+                retries=retries_count
             )
         except (urllib.error.URLError, urllib.error.HTTPError, socket.timeout, TimeoutError) as e:
             logging.error("Не удалось получить ответ для чанка №%d после всех попыток: %s", idx, e)
@@ -171,7 +181,7 @@ def main():
             try:
                 parsed = clean_json(raw_response)
                 if isinstance(parsed, list):
-                    if args.offset:
+                    if offset_enabled:
                         for item in parsed:
                             if isinstance(item, dict) and "line" in item:
                                 try:
